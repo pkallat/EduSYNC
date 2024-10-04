@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "EduS.Y.N.C.",
+  "version": "1.0",
+  "description": "Sync assignments from multiple LMS platforms to Google Calendar.",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "identity"
+  ],
+  "host_permissions": [
+    "https://www.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "1057854422312-kp6n7oso1pbihbntqp0dl4ol1nefh1d6.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/classroom.courses.readonly",
+      "https://www.googleapis.com/auth/calendar"
+    ]
+  }
+}
