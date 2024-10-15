@@ -10,7 +10,8 @@
     "identity"
   ],
   "host_permissions": [
-    "https://www.googleapis.com/*"
+    "https://www.googleapis.com/*",
+    "https://accounts.google.com/*"
   ],
   "oauth2": {
     "client_id": "1057854422312-kp6n7oso1pbihbntqp0dl4ol1nefh1d6.apps.googleusercontent.com",
