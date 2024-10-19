@@ -1,9 +1,14 @@
 ###THIS IS THE CODE USING AN AI TOOL FOR P2. THIS CODE ASSUMES ACCESS TO BLACKBOARD REST API AND REQUIRES ... THIS CODE PARSES BLACKBOARD'S CONTENT FOR CHANGES EVERY HOUR AND WILL ADD ANY NEW ONES TO MONGODB###
 import requests
-from bs4 import BeautifulSoup
+import json
 import schedule
 import time
-from pymongo import MongoClient
+from pymongo import MongoClient, errors
+
+# Blackboard API base URL and your credentials
+BB_API_URL = "https://blackboard.example.com/learn/api/public/v1"
+CLIENT_ID = "your_client_id"
+CLIENT_SECRET = "your_client_secret"
 
 # MongoDB setup
 mongo_client = MongoClient('mongodb://localhost:27017/')  # Replace with your MongoDB connection string
@@ -11,97 +16,97 @@ db = mongo_client['blackboard_db']  # Database
 collection = db['course_content']  # Collection for storing course content
 
 # Create an index on "contentId" to ensure uniqueness
-collection.create_index("contentId", unique=True)
+try:
+    collection.create_index("contentId", unique=True)
+    print("Index on 'contentId' created successfully.")
+except errors.DuplicateKeyError:
+    print("Index on 'contentId' already exists.")
+except Exception as e:
+    print(f"Error creating index: {e}")
 
-# Blackboard URLs
-LOGIN_URL = "https://blackboard.example.com/webapps/login/"
-COURSE_URL = "https://blackboard.example.com/learn/course_content/course_id_here"
-
-# Your login credentials (modify accordingly)
-USERNAME = 'your_username'
-PASSWORD = 'your_password'
-
-# Start session for requests
-session = requests.Session()
-
-# Function to log in to Blackboard
-def login_to_blackboard():
-    # This will vary depending on Blackboard's login form (inspect form structure for field names)
-    login_payload = {
-        'user_id': USERNAME,
-        'password': PASSWORD,
-        'login': 'Login'
+# Function to get the OAuth2 token
+def get_access_token():
+    url = f"{BB_API_URL}/oauth2/token"
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded"
     }
-
-    # Send POST request for login
-    response = session.post(LOGIN_URL, data=login_payload)
-    if "Welcome" in response.text:  # Change based on what the response looks like
-        print("Logged in successfully!")
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET
+    }
+    response = requests.post(url, headers=headers, data=data)
+    if response.status_code == 200:
+        token_info = response.json()
+        return token_info['access_token']
     else:
-        print("Login failed.")
+        print(f"Error getting token: {response.status_code}")
+        return None
 
-# Function to scrape course content
-def scrape_course_content():
-    # Make a GET request to the course page after logging in
-    response = session.get(COURSE_URL)
-    soup = BeautifulSoup(response.content, 'html.parser')
-
-    # Find content blocks, assuming they have a specific HTML structure
-    # Example: Modify selectors based on the Blackboard structure
-    content_blocks = soup.find_all('div', class_='content-block')  # Adjust the selector
-
-    course_updates = []
-
-    # Loop through content blocks and extract title, description, etc.
-    for block in content_blocks:
-        title = block.find('h3').text  # Assuming the title is in an <h3> tag
-        description = block.find('p').text  # Assuming the description is in a <p> tag
-        modified = block.find('time')['datetime']  # Assuming modified date is stored in <time>
-
-        # Create a content item dictionary
-        content_item = {
-            'contentId': hash(title + modified),  # Use a hash of title + modified date as the contentId
-            'title': title,
-            'description': description,
-            'modified': modified
-        }
-        course_updates.append(content_item)
-
-    return course_updates
+# Function to get course content using the Blackboard REST API
+def get_course_content(course_id, token):
+    url = f"{BB_API_URL}/courses/{course_id}/contents"
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        course_content = response.json()
+        return course_content['results']  # List of course content items
+    else:
+        print(f"Error getting course content: {response.status_code}")
+        return None
 
 # Function to check if the content is new
 def is_new_content(item):
-    if collection.find_one({"contentId": item['contentId']}):
-        return False
-    return True
+    # Check if the content already exists in MongoDB by its Blackboard content ID
+    if collection.find_one({"contentId": item['id']}):
+        return False  # Content already exists
+    else:
+        return True
 
 # Function to add new content to MongoDB
 def add_new_content_to_db(content_item):
+    document = {
+        "contentId": content_item['id'],
+        "title": content_item['title'],
+        "modified": content_item['modified'],
+        "created": content_item.get('created', None),
+        "description": content_item.get('description', None),
+        "courseId": content_item['courseId']  # Ensure courseId is part of the item
+    }
+    # Insert the new document into MongoDB
     try:
-        collection.insert_one(content_item)
+        collection.insert_one(document)
         print(f"Added new content: {content_item['title']} to MongoDB.")
+    except errors.DuplicateKeyError:
+        print(f"Duplicate content found: {content_item['title']}")
     except Exception as e:
         print(f"Error inserting content to MongoDB: {e}")
 
-# Function to scrape and check for new content
-def check_for_new_content():
-    print("Checking for new course content...")
-    course_updates = scrape_course_content()
+# Function to check for changes and add new events to MongoDB
+def check_for_changes():
+    print("Checking for course content updates...")
+    access_token = get_access_token()
+    if not access_token:
+        return
 
-    if course_updates:
-        for item in course_updates:
+    course_id = "course_id_here"  # Blackboard course ID
+    content = get_course_content(course_id, access_token)
+
+    if content:
+        for item in content:
+            # Check if the content is new
             if is_new_content(item):
+                # Add the new content to MongoDB
                 add_new_content_to_db(item)
             else:
                 print(f"Content already exists: {item['title']}")
     else:
-        print("No new content found or error occurred.")
+        print("No content found or error occurred.")
 
-# Schedule the scraper to run every hour
-schedule.every().hour.do(check_for_new_content)
-
-# Login to Blackboard before starting the scraper
-login_to_blackboard()
+# Schedule the scan to run every hour
+schedule.every().hour.do(check_for_changes)
 
 # Keep the script running
 while True:
