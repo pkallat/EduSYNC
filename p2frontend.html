@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment List</title>
+    <style>
+        .assignment {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upcoming Assignments</h1>
+    <div id="assignment-list"></div>
+
+    <script>
+        // Fetch assignments from the server and display them
+        async function fetchAssignments() {
+            try {
+                const response = await fetch('http://localhost:5000/api/assignments');
+                const assignments = await response.json();
+                displayAssignments(assignments);
+            } catch (error) {
+                console.error('Error fetching assignments:', error);
+            }
+        }
+
+        // Function to display assignments in the DOM
+        function displayAssignments(assignments) {
+            const assignmentList = document.getElementById('assignment-list');
+            assignmentList.innerHTML = ''; // Clear previous assignments
+
+            if (assignments.length === 0) {
+                assignmentList.innerHTML = '<p>No assignments found.</p>';
+                return;
+            }
+
+            assignments.forEach(assignment => {
+                const assignmentDiv = document.createElement('div');
+                assignmentDiv.className = 'assignment';
+                assignmentDiv.innerHTML = `
+                    <h3>${assignment.title}</h3>
+                    <p>Due: ${new Date(assignment.dueDate).toLocaleDateString()}</p>
+                `;
+                assignmentList.appendChild(assignmentDiv);
+            });
+        }
+
+        // Fetch assignments on page load
+        window.onload = fetchAssignments;
+    </script>
+</body>
+</html>
