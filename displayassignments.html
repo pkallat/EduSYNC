@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upcoming Assignments</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            text-align: center;
+        }
+        #assignment-list {
+            margin: 20px auto;
+            max-width: 600px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .assignment-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            margin: 10px 0;
+            background-color: #e8e8e8;
+            border-radius: 5px;
+        }
+        .assignment-title {
+            font-weight: bold;
+        }
+        .assignment-date {
+            color: #555;
+        }
+        .sync-button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4285F4;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .sync-button:hover {
+            background-color: #357ae8;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upcoming Assignments</h1>
+    
+    <div id="assignment-list">
+        <!-- Assignment items will be dynamically added here -->
+    </div>
+
+    <button class="sync-button" id="sync-button">Sync to Google Calendar</button>
+
+    <script>
+        // Example assignment data (this will be replaced with real data fetched from Blackboard)
+        const assignments = [
+            { title: 'Math Homework 1', dueDate: '2024-10-21' },
+            { title: 'History Essay', dueDate: '2024-10-23' },
+            { title: 'Physics Project', dueDate: '2024-10-25' }
+        ];
+
+        // Function to populate the assignment list
+        function displayAssignments() {
+            const assignmentList = document.getElementById('assignment-list');
+            assignmentList.innerHTML = '';  // Clear existing items
+
+            assignments.forEach(assignment => {
+                const assignmentItem = document.createElement('div');
+                assignmentItem.classList.add('assignment-item');
+
+                const title = document.createElement('span');
+                title.classList.add('assignment-title');
+                title.textContent = assignment.title;
+
+                const date = document.createElement('span');
+                date.classList.add('assignment-date');
+                date.textContent = `Due: ${assignment.dueDate}`;
+
+                assignmentItem.appendChild(title);
+                assignmentItem.appendChild(date);
+                assignmentList.appendChild(assignmentItem);
+            });
+        }
+
+        // Initial display of assignments
+        displayAssignments();
+
+        // Sync to Google Calendar button click event
+        document.getElementById('sync-button').addEventListener('click', () => {
+            alert('Syncing assignments to Google Calendar...');  // You can replace this with actual logic to sync
+        });
+    </script>
+</body>
+</html>
