@@ -1,0 +1,26 @@
+{
+  "name": "EduS.Y.N.C",          // Name of your project
+  "version": "1.0.0",                    // Current version of your project
+  "description": "A project to connect LMS assignments to Google Calendar", // Brief description of your project
+  "main": "p2server.js",                   // Main entry point of your application
+  "scripts": {
+    "test": "jest",                      // Command to run tests using Jest
+    "start": "node server.js"            // Command to start the server
+  },
+  "keywords": [],                        // Keywords related to your project (optional)
+  "author": "Team 3",                 // Author of the project                   
+  "dependencies": {
+    "express": "^4.17.1",                // Web framework for Node.js
+    "sqlite3": "^5.0.0",                 // SQLite database driver
+    "sequelize": "^6.6.2"                // ORM for SQL databases
+  },
+  "devDependencies": {
+    "jest": "^27.0.0",                   // Testing framework
+    "supertest": "^6.1.6",               // HTTP assertion library for testing
+    "fetch-mock": "^9.10.0",             // Mocking library for Fetch API
+    "jsdom": "^16.4.0"                   // JavaScript implementation of DOM for testing
+  },
+  "jest": {
+    "testEnvironment": "jsdom"           // Set the test environment for Jest
+  }
+}
