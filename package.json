@@ -5,7 +5,7 @@
   "main": "p2server.js",                   // Main entry point of your application
   "scripts": {
     "test": "jest",                      // Command to run tests using Jest
-    "start": "node server.js"            // Command to start the server
+    "start": "node p2server.js"            // Command to start the server
   },
   "keywords": [],                        // Keywords related to your project (optional)
   "author": "Team 3",                 // Author of the project                   
