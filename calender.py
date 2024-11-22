@@ -3,6 +3,7 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 import pickle
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -12,12 +13,11 @@ def authenticate_google_calendar():
     """
     Authenticate the user with Google Calendar API and return the service object.
 
-    This function checks if there are existing credentials saved in a file.
-    If not, it initiates the OAuth flow to obtain new credentials and saves
-    them for future use.
+    This function checks if there are existing credentials saved in a file. If not, 
+    it initiates the OAuth flow to obtain new credentials and saves them for future use.
 
     Returns:
-        Authenticated Google Calendar service object.
+        googleapiclient.discovery.Resource: Authenticated Google Calendar service object.
     """
     creds = None
     if creds_file := "token.pickle":
@@ -26,17 +26,39 @@ def authenticate_google_calendar():
                 creds = pickle.load(token)
         except FileNotFoundError:
             pass
-    # If no valid credentials, authenticate using OAuth
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
             creds = flow.run_local_server(port=0)
-        # Save credentials for future use
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
     return build('calendar', 'v3', credentials=creds)
+
+def fetch_events(calendar_service):
+    """
+    Fetch upcoming events from Google Calendar.
+
+    Args:
+        calendar_service (googleapiclient.discovery.Resource): Authenticated Google Calendar service object.
+
+    Returns:
+        list: A list of events with their ID, name, and start date (formatted as YYYY-MM-DD).
+    """
+    now = datetime.utcnow().isoformat() + 'Z'  
+    events_result = calendar_service.events().list(
+        calendarId='primary', timeMin=now, maxResults=10, singleEvents=True,
+        orderBy='startTime').execute()
+    events = events_result.get('items', [])
+    
+    formatted_events = []
+    for event in events:
+        event_start = event['start'].get('dateTime', event['start'].get('date'))
+        formatted_date = event_start.split('T')[0] if 'T' in event_start else event_start
+        formatted_events.append({'id': event['id'], 'name': event['summary'], 'start': formatted_date})
+    
+    return formatted_events
 
 def create_event(calendar_service, event_name, event_date):
     """
@@ -48,21 +70,33 @@ def create_event(calendar_service, event_name, event_date):
         event_date (str): The date of the event in YYYY-MM-DD format.
 
     Returns:
-        link to the event in Google Calendar.
+        dict: The created event object as returned by Google Calendar API.
     """
     event = {
         'summary': event_name,
         'start': {
-            'dateTime': f"{event_date}T09:00:00",  
+            'dateTime': f"{event_date}T23:59:59",  
             'timeZone': 'America/New_York',
         },
         'end': {
-            'dateTime': f"{event_date}T10:00:00",  
+            'dateTime': f"{event_date}T23:59:59",  
             'timeZone': 'America/New_York',
         },
     }
     return calendar_service.events().insert(calendarId='primary', body=event).execute()
 
+def delete_event(calendar_service, event_id):
+    """
+    Delete an event from Google Calendar.
+
+    Args:
+        calendar_service (googleapiclient.discovery.Resource): Authenticated Google Calendar service object.
+        event_id (str): The unique ID of the event to be deleted.
+
+    Returns:
+        None
+    """
+    calendar_service.events().delete(calendarId='primary', eventId=event_id).execute()
 
 html_template = """
 <!DOCTYPE html>
@@ -70,23 +104,23 @@ html_template = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Google Calendar Event</title>
+    <title>Google Calendar Manager</title>
 </head>
 <body>
-    <h1>Create Google Calendar Event</h1>
+    <h1>Manage Google Calendar Events</h1>
     <form method="POST" action="/create_event">
         <input type="text" name="event_name" placeholder="Event Name" required>
         <input type="date" name="event_date" required>
         <button type="submit">Create Event</button>
     </form>
     <div class="events-list">
-        <h2>Events</h2>
+        <h2>Current Events</h2>
         <ul id="event-list">
-            {% for event_id, event_name in events.items() %}
+            {% for event in events %}
                 <li>
-                    {{ event_name }}
+                    {{ event.name }} ({{ event.start }})
                     <form method="POST" action="/delete_event" style="display:inline;">
-                        <input type="hidden" name="event_id" value="{{ event_id }}">
+                        <input type="hidden" name="event_id" value="{{ event.id }}">
                         <button type="submit">Delete</button>
                     </form>
                 </li>
@@ -96,73 +130,62 @@ html_template = """
 </body>
 </html>
 """
-event_store = {}
+
 @app.route("/", methods=["GET"])
 def index():
     """
-    Display the HTML form for creating a Google Calendar event.
+    Display the HTML form for creating a Google Calendar event
+    and fetch current events to display on the page.
 
     Returns:
-        str: The rendered HTML form template.
+        str: The rendered HTML form with current events.
     """
-    return render_template_string(html_template,events=event_store)
+    try:
+        service = authenticate_google_calendar()
+        events = fetch_events(service)
+    except Exception as e:
+        events = []
+        print(f"An error occurred while fetching events: {e}")
+    return render_template_string(html_template, events=events)
 
 @app.route("/create_event", methods=["POST"])
 def handle_form_submission():
     """
-    Handle form submission, create a Google Calendar event, and display the result.
+    Handle form submission, create a Google Calendar event, and refresh the page.
 
     Extracts event name and date from the submitted form, authenticates with Google Calendar,
-    and creates the event. Returns a success message with the event link or an error message.
+    and creates the event. Refreshes the page to show updated events.
 
     Returns:
-        str: A success or error message based on the outcome.
+        str: Rendered HTML page with updated events.
     """
     event_name = request.form.get("event_name")
     event_date = request.form.get("event_date")
-    
     try:
         service = authenticate_google_calendar()
-        event_result = create_event(service, event_name, event_date)
-        event_store[event_result['id']] = event_name
-        return render_template_string(html_template, events=event_store)
+        create_event(service, event_name, event_date)
     except Exception as e:
         return f"An error occurred: {e}"
-
-def delete_event(calendar_service, event_id):
-    """
-    Delete an event from Google Calendar.
-
-    Args:
-        calendar_service (googleapiclient.discovery.Resource): Authenticated Google Calendar service object.
-        event_id (str): The ID of the event to be deleted.
-    """
-    try:
-        calendar_service.events().delete(calendarId='primary', eventId=event_id).execute()
-    except Exception as e:
-        raise Exception(f"Failed to delete event with ID {event_id}: {e}")
+    return index()
 
 @app.route("/delete_event", methods=["POST"])
 def handle_event_deletion():
     """
-    Handle event deletion from Google Calendar.
+    Handle event deletion from Google Calendar and refresh the page.
 
-    Extracts the event ID from the request, deletes the event from Google Calendar,
-    and removes it from the in-memory store.
+    Extracts event ID from the submitted form, authenticates with Google Calendar,
+    and deletes the specified event. Refreshes the page to show updated events.
+
+    Returns:
+        str: Rendered HTML page with updated events.
     """
     event_id = request.form.get("event_id")
-    if not event_id:
-        return "Event ID is missing. Cannot delete the event.", 400
-
     try:
         service = authenticate_google_calendar()
-        delete_event(service, event_id)  # Delete the event from Google Calendar
-        event_store.pop(event_id, None)  # Remove the event from the local in-memory store
-        return render_template_string(html_template, events=event_store)
-    except KeyError:
-        return render_template_string(html_template, events=event_store, message=f"Event ID {event_id} does not exist.")
+        delete_event(service, event_id)
     except Exception as e:
-        return render_template_string(html_template, events=event_store, message=f"An error occurred: {e}")
+        return f"An error occurred: {e}"
+    return index()
 
 if __name__ == "__main__":
     """
