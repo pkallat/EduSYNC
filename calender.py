@@ -6,7 +6,6 @@ import pickle
 
 app = Flask(__name__)
 
-# Authenticate Google Calendar
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 def authenticate_google_calendar():
@@ -64,7 +63,7 @@ def create_event(calendar_service, event_name, event_date):
     }
     return calendar_service.events().insert(calendarId='primary', body=event).execute()
 
-# HTML Template
+
 html_template = """
 <!DOCTYPE html>
 <html lang="en">
@@ -80,10 +79,24 @@ html_template = """
         <input type="date" name="event_date" required>
         <button type="submit">Create Event</button>
     </form>
+    <div class="events-list">
+        <h2>Events</h2>
+        <ul id="event-list">
+            {% for event_id, event_name in events.items() %}
+                <li>
+                    {{ event_name }}
+                    <form method="POST" action="/delete_event" style="display:inline;">
+                        <input type="hidden" name="event_id" value="{{ event_id }}">
+                        <button type="submit">Delete</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
 </body>
 </html>
 """
-
+event_store = {}
 @app.route("/", methods=["GET"])
 def index():
     """
@@ -92,7 +105,7 @@ def index():
     Returns:
         str: The rendered HTML form template.
     """
-    return render_template_string(html_template)
+    return render_template_string(html_template,events=event_store)
 
 @app.route("/create_event", methods=["POST"])
 def handle_form_submission():
@@ -108,13 +121,48 @@ def handle_form_submission():
     event_name = request.form.get("event_name")
     event_date = request.form.get("event_date")
     
-    # Authenticate and create the event
     try:
         service = authenticate_google_calendar()
         event_result = create_event(service, event_name, event_date)
-        return f"Event created: <a href='{event_result.get('htmlLink')}'>{event_result.get('htmlLink')}</a>"
+        event_store[event_result['id']] = event_name
+        return render_template_string(html_template, events=event_store)
     except Exception as e:
         return f"An error occurred: {e}"
+
+def delete_event(calendar_service, event_id):
+    """
+    Delete an event from Google Calendar.
+
+    Args:
+        calendar_service (googleapiclient.discovery.Resource): Authenticated Google Calendar service object.
+        event_id (str): The ID of the event to be deleted.
+    """
+    try:
+        calendar_service.events().delete(calendarId='primary', eventId=event_id).execute()
+    except Exception as e:
+        raise Exception(f"Failed to delete event with ID {event_id}: {e}")
+
+@app.route("/delete_event", methods=["POST"])
+def handle_event_deletion():
+    """
+    Handle event deletion from Google Calendar.
+
+    Extracts the event ID from the request, deletes the event from Google Calendar,
+    and removes it from the in-memory store.
+    """
+    event_id = request.form.get("event_id")
+    if not event_id:
+        return "Event ID is missing. Cannot delete the event.", 400
+
+    try:
+        service = authenticate_google_calendar()
+        delete_event(service, event_id)  # Delete the event from Google Calendar
+        event_store.pop(event_id, None)  # Remove the event from the local in-memory store
+        return render_template_string(html_template, events=event_store)
+    except KeyError:
+        return render_template_string(html_template, events=event_store, message=f"Event ID {event_id} does not exist.")
+    except Exception as e:
+        return render_template_string(html_template, events=event_store, message=f"An error occurred: {e}")
 
 if __name__ == "__main__":
     """
