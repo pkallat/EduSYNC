@@ -1,4 +1,11 @@
+RUNNING THE PROJECT
 make sure credentials.json is in the same directory as calender.py 
 in your terminal run the command "pip install --upgrade google-api-python-client google-auth-httplib2 google-auth-oauthlib" may need to add python3 before pip for it to work
 also run "pip install flask" 
 once you run the code open your browser and go to "http://127.0.0.1:5000"
+
+RUNNING THE TESTS
+make sure unitts.py is in the same directory as the rest of the code
+run "pip install coverage" 
+in the terminal run "python -m unittest unittest"
+to see the coverage report run "coverage report"
