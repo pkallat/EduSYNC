@@ -9,3 +9,21 @@ make sure unitts.py is in the same directory as the rest of the code
 run "pip install coverage" 
 in the terminal run "python -m unittest unittest"
 to see the coverage report run "coverage report"
+
+SYSTEM TESTING:
+Once the app is running (`python calender.py`), follow these steps to test it manually:
+
+1. Open your browser and go to "http://127.0.0.1:5000".
+2. Test creating events:
+   - Fill in the event name and date in the form.
+   - Submit it, and check if the event shows up in your Google Calendar.
+3. Test deleting events:
+   - Use the delete option on an event.
+   - Make sure the event is removed from your Google Calendar.
+4. Test invalid inputs:
+   - Leave the event name blank or enter a bad date format.
+   - Check if the app shows an error or handles it without breaking.
+
+NOTES:
+- You’ll need to complete the Google login process (OAuth flow) in your browser when testing.
+- Some rare errors (like expired tokens or too many API requests) can’t be tested easily, so we just note them as untested.
